@@ -2,139 +2,128 @@
 ### Reserva de la Biosfera Maya · Universidad Da Vinci de Guatemala
 **Facultad de Ingeniería · Fundamentos de Programación 2**
 
----
-
 ## 📌 Datos Generales de la Entrega
 
 | Campo | Detalle |
 | :--- | :--- |
-| **Estudiante** | [Nombre Completo del Estudiante] |
+| **Estudiante** | Samy Josue Ruiz Monzón |
 | **Carné Universitario** | [Número de Carné] |
 | **Curso** | Fundamentos de Programación 2 |
 | **Grupo / Sección** | Sección A |
-| **Entrega** | **Entrega 4 — Ordenar las alertas y buscar animales (Selección y Búsqueda Binaria)** |
-| **Fecha** | Noviembre de 2026 |
-| **Repositorio Oficial** | `https://github.com/[tu-usuario]/guardianes-del-peten` *(Público)* |
+| **Entrega** | **Entrega 5 — Recursividad: Zonas dentro de zonas (Árbol territorial)** |
+| **Fecha** | 15 de noviembre de 2026 |
+| **Repositorio Oficial** | `https://github.com/samyruiz/guardianes-del-peten` *(Público)* |
 
----
+## 📖 Descripción General de la Entrega 5
 
-## 📖 Descripción General del Sistema
+En esta **Entrega 5**, el sistema **Guardianes del Petén** modela la estructura territorial real de la Reserva de la Biosfera Maya mediante **recursividad y árboles n-arios (Patrón Composite)**: una zona de primer nivel (como *Laguna del Tigre*) puede contener sectores (como *Sector El Perú-Waka'*), los cuales a su vez contienen subsectores o aguadas (como *Aguada El Sibal* y *Aguada La Escondida*), sin límite fijo de profundidad.
 
-El proyecto **Guardianes del Petén** es una solución integral orientada a objetos para la gestión de telemetría, conservación y respuesta operativa ante eventos críticos de fauna en la Reserva de la Biosfera Maya (Petén, Guatemala).
+Cada nodo de la clase `Zona` mantiene su propia lista de `subzonas` y de `animales` ubicados en ella, resolviendo las operaciones de visualización, conteo y búsqueda mediante **llamadas recursivas directas sobre cada subzona**:
+1. **Estructura compuesta y guarda R5 (`agregar_subzona` y `ubicar`):** Agrega subzonas validando que su tipo cumpla el Artículo 5 (`núcleo`, `amortiguamiento` o `uso múltiple`) y ubica animales en cualquier nivel del árbol.
+2. **Mapa jerárquico recursivo (`mostrar(nivel=0)`):** Imprime la zona actual con una sangría de `2 * nivel` espacios y se invoca a sí mismo con `nivel + 1` para cada subzona.
+3. **Conteo recursivo de fauna (`contar_animales()`):** Suma los animales ubicados directamente en la zona (`len(self.animales)`) más el retorno recursivo de `subzona.contar_animales()` de todas sus subzonas. En `SistemaMonitoreo`, suma lo que devuelve cada zona de primer nivel.
+4. **Búsqueda recursiva en profundidad (`buscar_sector(nombre)`):** Verifica primero el caso base (si la zona actual coincide con el nombre buscado, se devuelve a sí misma `self`); en el paso recursivo, consulta a cada subzona y retorna la primera respuesta distinta de `None` (o `None` si no se encuentra en ninguna rama).
 
-En esta **Entrega 4**, el sistema incorpora dos capacidades algorítmicas esenciales desarrolladas desde cero sin utilizar bibliotecas o métodos integrados (`sort()`, `sorted()`, `bisect`):
-1. **Ordenamiento de Alertas por Selección (*Selection Sort*):** Prioriza la atención de eventos críticos colocando primero las alertas de prioridad **alta** y luego las de prioridad **media**; ante alertas con el mismo nivel de prioridad, las ordena cronológicamente por su **hora más temprana** de reporte.
-2. **Búsqueda Binaria de Animales por Código (*Binary Search*):** Permite al personal de campo y biólogos localizar instantáneamente la ficha biológica completa de un espécimen en tiempo logarítmico $\mathcal{O}(\log n)$, buscando sobre la colección previamente ordenada por código alfanumérico.
+## 📐 1. Diagrama de Clases UML Actualizado (Entrega 5)
 
----
+El diagrama de clases UML incorpora en `Zona` las listas `subzonas` y `animales`, los métodos `agregar_subzona()`, `ubicar()`, `mostrar(nivel=0)`, `contar_animales()` y `buscar_sector(nombre)`, la **relación reflexiva (auto-asociación `0..*`)** de `Zona` consigo misma, y los métodos delegadores en la clase central `SistemaMonitoreo`.
 
-## 📐 1. Diagrama de Clases UML Actualizado
+![Diagrama de Clases UML - Entrega 5](diagrama_clases_e5.png)
 
-El diagrama modela la arquitectura completa del sistema, destacando la clase central `SistemaMonitoreo` con sus dos nuevos métodos algorítmicos (`ordenar_alertas()`, `buscar_animal()`), asociada a la jerarquía de herencia polimórfica encabezada por la clase abstracta `Animal` y sus cinco clases hijas especializadas.
+## ⚙️ 2. Implementación de los Métodos Recursivos
 
-![Diagrama de Clases UML - Entrega 4](diagrama_clases_e4.png)
-
-### Métodos Clave Incorporados en `SistemaMonitoreo`:
-* `+ ordenar_alertas(): list[Alerta]`: Ordenamiento por selección in-place sobre la lista de alertas con criterio compuesto (prioridad y hora). Exactamente un intercambio por pasada.
-* `+ ordenar_animales(): list[Animal]`: Ordenamiento por selección alfanumérico por código de animal (`codigo`), preparando la lista para la búsqueda binaria.
-* `+ buscar_animal(codigo: str): Animal | None`: Algoritmo de búsqueda binaria con punteros `inicio`, `fin` y `medio`. Devuelve la referencia al objeto o `None`.
-
----
-
-## ⚙️ 2. Fundamentos Algorítmicos
-
-### 2.1 Ordenamiento por Selección de Alertas (`ordenar_alertas`)
-Para responder de forma inmediata a emergencias territoriales (como la incursión de jaguares en comunidades humanas bajo el Artículo 6), las alertas se ordenan utilizando una función de mapeo numérico de prioridad:
+### 2.1 Clase `Zona` (`zona.py`)
 ```python
-def nivel(alerta):
-    if alerta.prioridad.lower() == "alta":
-        return 1
-    return 2
-```
-* **Criterio de ordenamiento:** En cada iteración $i$, se busca la alerta con menor `nivel(alerta)`. Si dos alertas empatan en nivel, se desempata evaluando la cadena cronológica `alerta.hora` en formato militar `"HH:MM"`.
-* **Intercambio único:** Una vez identificado el índice del mínimo de los elementos restantes, se realiza un solo intercambio `swap` con la posición $i$, garantizando estabilidad algorítmica.
+def mostrar(self, nivel: int = 0):
+    sangria = "  " * nivel
+    nombres_animales = ", ".join([f"{a.nombre} ({a.codigo})" for a in self.animales])
+    info_animales = f" -> Animales aquí [{len(self.animales)}]: {nombres_animales}" if self.animales else " -> [Sin animales en este nivel]"
+    print(f"{sangria}- {self.nombre} (Tipo: {self.tipo_zona}){info_animales}")
 
-### 2.2 Búsqueda Binaria de Animales (`buscar_animal`)
-Permite consultar especímenes por código (`COC-001`, `GUA-001`, `JAG-001`, `MON-001`, `TAP-001`) partiendo el espacio a la mitad en cada ciclo:
+    for subzona in self.subzonas:
+        subzona.mostrar(nivel + 1)
+
+def contar_animales(self) -> int:
+    total = len(self.animales)
+    for subzona in self.subzonas:
+        total += subzona.contar_animales()
+    return total
+
+def buscar_sector(self, nombre: str):
+    if self.nombre.lower() == nombre.strip().lower():
+        return self
+
+    for subzona in self.subzonas:
+        encontrado = subzona.buscar_sector(nombre)
+        if encontrado is not None:
+            return encontrado
+
+    return None
+```
+
+### 2.2 Clase Central `SistemaMonitoreo` (`sistema_monitoreo.py`)
 ```python
-inicio = 0
-fin = len(self.animales) - 1
+def contar_animales(self) -> int:
+    total = 0
+    for zona_raiz in self.zonas:
+        total += zona_raiz.contar_animales()
+    return total
 
-while inicio <= fin:
-    medio = (inicio + fin) // 2
-    if self.animales[medio].codigo == codigo:
-        return self.animales[medio]
-    elif codigo < self.animales[medio].codigo:
-        fin = medio - 1
-    else:
-        inicio = medio + 1
-
-return None
+def buscar_sector(self, nombre: str) -> Zona:
+    for zona_raiz in self.zonas:
+        encontrado = zona_raiz.buscar_sector(nombre)
+        if encontrado is not None:
+            return encontrado
+    return None
 ```
-* **Complejidad:** Reduce las comparaciones de $\mathcal{O}(n)$ a $\mathcal{O}(\log n)$, eliminando la necesidad de recorrer secuencialmente el inventario completo.
 
----
-
-## 📂 3. Estructura Modular del Proyecto
-
-Cada clase reside en su propio archivo independiente dentro del repositorio:
+## 📂 3. Estructura de Archivos del Repositorio
 
 ```text
 guardianes-del-peten/
 │
-├── animal.py                # Clase abstracta base Animal (ABC) con método abstracto describir()
-├── jaguar.py                # Clase concreta Jaguar (Panthera onca)
-├── tapir.py                 # Clase concreta Tapir (Tapirus bairdii)
-├── guacamaya_roja.py        # Clase concreta GuacamayaRoja (Ara macao)
-├── cocodrilo_de_pantano.py  # Clase concreta CocodriloDePantano (Crocodylus moreletii)
-├── mono_arana.py            # Clase concreta MonoArana (Ateles geoffroyi) - Especie propia
-├── collar.py                # Clase Collar GPS de telemetría
-├── zona.py                  # Clase Zona territorial (núcleo, amortiguamiento, uso múltiple)
-├── guardarrecursos.py       # Clase Guardarrecursos oficial
-├── lectura.py               # Clase Lectura de movimiento o avistamiento
-├── alerta.py                # Clase Alerta (con prioridad, detalle y atributo hora)
-├── servicio_sms.py          # Simulador de despacho de mensajería SMS a guardarrecursos
-├── sistema_monitoreo.py     # Clase central: guardas, Selection Sort y Binary Search
-├── main.py                  # Programa principal de pruebas y evidencias
-├── diagrama_clases_e4.png   # Diagrama de Clases UML oficial actualizado
-├── captura_e4_pruebas.png   # Evidencia de terminal de las Pruebas 1 y 2
-├── captura_e4_operatividad.png # Evidencia de terminal de la Prueba 3
-└── README.md                # Documentación oficial del repositorio
+├── animal.py                    # Clase abstracta base Animal (ABC) con describir()
+├── jaguar.py                    # Clase concreta Jaguar (Panthera onca)
+├── tapir.py                     # Clase concreta Tapir (Tapirus bairdii)
+├── guacamaya_roja.py            # Clase concreta GuacamayaRoja (Ara macao)
+├── cocodrilo_de_pantano.py      # Clase concreta CocodriloDePantano (Crocodylus moreletii)
+├── mono_arana.py                # Clase concreta MonoArana (Ateles geoffroyi)
+├── collar.py                    # Clase Collar GPS de telemetría
+├── zona.py                      # Clase Zona recursiva (subzonas, animales, mostrar, contar, buscar)
+├── guardarrecursos.py           # Clase Guardarrecursos oficial
+├── lectura.py                   # Clase Lectura de movimiento o avistamiento
+├── alerta.py                    # Clase Alerta con prioridad y hora
+├── servicio_sms.py              # Simulador de despacho de mensajería SMS
+├── sistema_monitoreo.py         # Clase central gestora (recursividad, selección, búsqueda binaria, guardas)
+├── main.py                      # Programa principal con las pruebas de la Entrega 5 y continuidad 1-4
+├── diagrama_clases_e5.png       # Diagrama de Clases UML actualizado (Entrega 5)
+├── captura_e5_recursividad.png  # Evidencia de ejecución: Mapa recursivo, conteo y búsquedas
+├── captura_e5_continuidad.png   # Evidencia de ejecución: Continuidad de Entregas 1 a 4
+└── README.md                    # Documentación oficial del repositorio
 ```
-
----
 
 ## 🖥️ 4. Evidencia de Ejecución de `main.py`
 
-### 4.1 Evidencia de Pruebas 1 y 2: Ordenamiento y Búsqueda Binaria
-Demostración de:
-1. Lista de alertas original en desorden con prioridades altas/medias y horas heterogéneas.
-2. Lista de alertas ordenada correctamente (Prioridades altas primero ordenadas por hora, seguidas de prioridades medias ordenadas por hora).
-3. Búsqueda binaria exitosa del **primer código** (`COC-001`), del **último código** (`TAP-001`) y de un código **inexistente** (`LEO-999` devolviendo `None`).
+### 4.1 Pruebas de Recursividad (Mapa de 3 Niveles, Conteo y Búsqueda de Sectores)
+1. **Mapa de 3 niveles y 8 zonas:**
+   * `Laguna del Tigre` (Nivel 0) $\rightarrow$ `Sector Paso Caballos` (Nivel 1) y `Sector El Perú-Waka'` (Nivel 1) $\rightarrow$ `Aguada El Sibal` (Nivel 2) y `Aguada La Escondida` (Nivel 2).
+   * `Mirador-Río Azul` (Nivel 0) $\rightarrow$ `Sector Dos Lagunas` (Nivel 1).
+   * `Uaxactún` (Nivel 0).
+2. **6 animales ubicados en distintos niveles:** `Sobek` y `Ka'ax` en Nivel 0; `K'inich` e `Ixchel` en Nivel 1; `Balam` y `Tziquin` en el Nivel 2 (más profundo).
+3. **Conteo recursivo:** `6` animales en toda la reserva; `4` animales en `Laguna del Tigre` y sus subzonas; `1` animal en `Mirador-Río Azul`.
+4. **Tres búsquedas recursivas:** `Aguada El Sibal` (nivel más profundo), `Laguna del Tigre` (primer nivel) y `Aguada Perdida del Sur` (inexistente $\rightarrow$ `None`).
 
-![Evidencia Pruebas 1 y 2](captura_e4_pruebas.png)
+![Evidencia de Recursividad Entrega 5](captura_e5_recursividad.png)
 
-### 4.2 Evidencia de Prueba 3: Continuidad Operativa (Entregas 1, 2 y 3)
-Demostración de:
-1. Ciclo polimórfico recorriendo todas las especies sin `if` ni `isinstance`.
-2. Captura del `TypeError` al intentar instanciar directamente la clase abstracta `Animal`.
-3. Telemetría GPS con alertas SMS a guardarrecursos en Uaxactún (Art. 6), avistamientos, atención de alertas (Art. 8), cambio de batería (Art. 9) y guardas del reglamento.
+### 4.2 Continuidad Operativa de las Entregas 1 a 4
+Se comprueba que el ordenamiento por selección de alertas (`ordenar_alertas()`), la búsqueda binaria de animales (`buscar_animal()`), el ciclo polimórfico (`describir()`), la validación de clase abstracta (`TypeError`) y los reportes de telemetría GPS con alertas SMS siguen funcionando íntegramente.
 
-![Evidencia Prueba 3 Operatividad](captura_e4_operatividad.png)
+![Evidencia de Continuidad Entregas 1 a 4](captura_e5_continuidad.png)
 
----
-
-## 🚀 5. Instrucciones de Ejecución
-
-Para clonar y ejecutar el sistema en cualquier entorno con Python 3 instalado:
+## 🚀 5. Ejecución Local
 
 ```bash
-# 1. Clonar el repositorio público
-git clone https://github.com/[tu-usuario]/guardianes-del-peten.git
-
-# 2. Entrar al directorio
+git clone https://github.com/samyruiz/guardianes-del-peten.git
 cd guardianes-del-peten
-
-# 3. Ejecutar el programa principal
 python3 main.py
 ```

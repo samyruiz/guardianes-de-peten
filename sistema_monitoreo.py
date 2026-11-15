@@ -1,8 +1,9 @@
 """
 Módulo principal del sistema de monitoreo: SistemaMonitoreo.
 Contiene la clase central que administra las listas de objetos, las guardas
-de los Artículos 1 al 10 y los algoritmos de ordenamiento por selección y
-búsqueda binaria (Entrega 4).
+de los Artículos 1 al 10, los algoritmos de ordenamiento por selección y
+búsqueda binaria (Entrega 4), y la delegación recursiva sobre el árbol de zonas
+y sectores de la Reserva de la Biosfera Maya (Entrega 5).
 """
 
 import re
@@ -19,7 +20,7 @@ class SistemaMonitoreo:
         # Arreglos de objetos del sistema
         self.animales = []          # Lista de objetos Animal (polimórfica)
         self.collares = []          # Lista de objetos Collar
-        self.zonas = []             # Lista de objetos Zona
+        self.zonas = []             # Lista de zonas de primer nivel (raíces del árbol territorial)
         self.guardarrecursos = []   # Lista de objetos Guardarrecursos
         self.lecturas = []          # Lista de objetos Lectura
         self.alertas = []           # Lista de objetos Alerta
@@ -37,6 +38,57 @@ class SistemaMonitoreo:
         }
 
     # =========================================================================
+    # ENTREGA 5: RECURSIVIDAD — ZONAS DENTRO DE ZONAS (ÁRBOL DE SECTORES)
+    # =========================================================================
+
+    def agregar_zona_raiz(self, zona: Zona) -> bool:
+        """
+        Registra una zona de primer nivel en el sistema, validando su tipo
+        con la guarda R5 (Art. 5: núcleo, amortiguamiento, uso múltiple).
+        """
+        if not isinstance(zona, Zona) or not Zona.validar_tipo_zona(zona.tipo_zona):
+            tipo_inv = getattr(zona, 'tipo_zona', str(zona))
+            print(f"Rechazado: Tipo de zona '{tipo_inv}' inválido para '{getattr(zona, 'nombre', '')}'. [Guarda R5 / Art. 5]")
+            return False
+        self.zonas.append(zona)
+        return True
+
+    def mostrar_mapa(self):
+        """
+        Imprime el mapa jerárquico completo de la reserva llamando al método
+        recursivo mostrar(nivel=0) sobre cada zona de primer nivel.
+        """
+        print("\n=== MAPA JERÁRQUICO DE LA RESERVA DE LA BIOSFERA MAYA ===")
+        if not self.zonas:
+            print("  (No hay zonas registradas en el mapa)")
+        else:
+            for zona_raiz in self.zonas:
+                zona_raiz.mostrar(nivel=0)
+        print("=========================================================")
+
+    def contar_animales(self) -> int:
+        """
+        Suma recursivamente lo que devuelve contar_animales() de cada zona
+        de primer nivel para obtener el total de animales ubicados en la reserva.
+        """
+        total = 0
+        for zona_raiz in self.zonas:
+            total += zona_raiz.contar_animales()
+        return total
+
+    def buscar_sector(self, nombre: str) -> Zona:
+        """
+        Busca recursivamente un sector, zona o aguada por su nombre preguntándole
+        a cada zona de primer nivel. Devuelve la primera respuesta que no sea None,
+        o None si no existe en ningún punto del árbol.
+        """
+        for zona_raiz in self.zonas:
+            encontrado = zona_raiz.buscar_sector(nombre)
+            if encontrado is not None:
+                return encontrado
+        return None
+
+    # =========================================================================
     # ENTREGA 4: ALGORITMOS DE ORDENAMIENTO POR SELECCIÓN Y BÚSQUEDA BINARIA
     # Implementados desde cero sin sort(), sorted() ni bisect.
     # =========================================================================
@@ -47,7 +99,6 @@ class SistemaMonitoreo:
         Criterio compuesto:
           1° Nivel de prioridad: 'alta' = 1, 'media' = 2.
           2° Ante igual prioridad: hora más temprana ('HH:MM').
-        En cada pasada busca el elemento menor de los que faltan y lo intercambia al frente.
         Exactamente un intercambio por pasada. Sin sort() ni sorted().
         """
         def nivel(alerta):
@@ -65,14 +116,12 @@ class SistemaMonitoreo:
                 nivel_cand = nivel(alerta_cand)
                 nivel_min = nivel(alerta_min)
 
-                # Comparación: primero nivel numérico, desempate por hora cronológica
                 if nivel_cand < nivel_min:
                     indice_menor = j
                 elif nivel_cand == nivel_min:
                     if alerta_cand.hora < alerta_min.hora:
                         indice_menor = j
 
-            # Un solo intercambio por pasada
             if indice_menor != i:
                 self.alertas[i], self.alertas[indice_menor] = self.alertas[indice_menor], self.alertas[i]
 
@@ -81,7 +130,6 @@ class SistemaMonitoreo:
     def ordenar_animales(self):
         """
         Ordena la lista de animales por su código (alfanumérico) usando Selection Sort.
-        Requisito previo indispensable para la búsqueda binaria.
         Sin sort() ni sorted().
         """
         n = len(self.animales)
@@ -98,16 +146,13 @@ class SistemaMonitoreo:
         """
         Busca un animal por su código utilizando Búsqueda Binaria (Binary Search).
         Divide el espacio de búsqueda a la mitad en cada iteración (inicio, fin, medio).
-        Complejidad temporal: O(log n).
-        Retorna el objeto Animal encontrado, o None si no existe en la lista.
+        Retorna el objeto Animal encontrado, o None si no existe.
         """
         if not self.animales:
             return None
 
-        # 1. Asegurar que la colección esté ordenada por código con Selection Sort
         self.ordenar_animales()
 
-        # 2. Algoritmo de Búsqueda Binaria
         inicio = 0
         fin = len(self.animales) - 1
 
@@ -134,10 +179,11 @@ class SistemaMonitoreo:
         return None
 
     def buscar_zona(self, nombre: str) -> Zona:
-        for z in self.zonas:
-            if z.nombre.lower() == nombre.lower():
-                return z
-        return None
+        """
+        Busca una zona o sector en cualquier nivel del árbol territorial
+        reutilizando el método recursivo buscar_sector().
+        """
+        return self.buscar_sector(nombre)
 
     def buscar_guardarrecursos(self, codigo: str) -> Guardarrecursos:
         for g in self.guardarrecursos:
@@ -152,7 +198,6 @@ class SistemaMonitoreo:
         return None
 
     def listar_alertas(self, titulo: str = "Lista de Alertas del Sistema"):
-        """Imprime la lista actual de alertas de forma tabulada."""
         print(f"\n--- {titulo} ---")
         if not self.alertas:
             print("   (No hay alertas registradas)")
@@ -215,24 +260,20 @@ class SistemaMonitoreo:
             codigo = animal_o_codigo
             animal_obj = None
 
-        # ¿el código tiene el formato correcto? (Art. 1)
         if not self._validar_formato_codigo_animal(codigo):
             print(f"Rechazado: Código inválido '{codigo}'. Debe tener 3 letras mayúsculas, guion y 3 dígitos (ej: JAG-001). [Art. 1]")
             return False
 
-        # ¿el código ya existe? (Art. 1)
         if self.buscar_animal(codigo) is not None:
             print(f"Rechazado: Código repetido '{codigo}'. Ya existe un animal registrado con este código. [Art. 1]")
             return False
 
-        # Guarda Art. 2: Estado de conservación coherente
         if not self._validar_estado_conservacion(especie, en_peligro):
             estado_esperado = "en peligro" if self.catalogo_conservacion.get(especie.lower()) else "no amenazado"
             print(f"Rechazado: El estado de conservación indicado para '{especie}' no coincide con el reglamento (debe ser {estado_esperado}). [Art. 2]")
             return False
 
         if animal_obj is None:
-            # Nota: si se pasan datos primitivos, se crea una subclase genérica o se rechaza si es abstracta
             from jaguar import Jaguar
             animal_obj = Jaguar(codigo, nombre, "patron_base", 50.0)
 
